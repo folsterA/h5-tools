@@ -17,4 +17,7 @@ fn main() {
         ffi::H5Tset_fields(double_type, 63, 52, 11, 0, 52);
     }
     println!("{double_type}");
+
+    let new_double_type = unsafe { ffi::H5T_NATIVE_DOUBLE_g };
+    println!("{new_double_type}");
 }

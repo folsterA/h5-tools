@@ -1,39 +1,34 @@
-use std::env;
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
 fn main() {
-    // Tell cargo to look for shared libraries in the specified directory
-    println!("cargo:rustc-link-search=C:/Program Files/HDF_Group/HDF5/1.14.6/lib");
+    // 1) Compile our shim.c
+    cc::Build::new()
+        .file("shim.c")
+        .include(r"C:\Users\Austin\Documents\hdf5-1.14.6\install114\my-Static-Tools-Clang\include")
+        .compile("shim");
 
-    // Tell cargo to tell rustc to link the system bzip2
-    // shared library.
-    println!("cargo:rustc-link-lib=hdf5");
-
-    // The bindgen::Builder is the main entry point
-    // to bindgen, and lets you build up options for
-    // the resulting bindings.
+    // 2) Generate bindings for all H5 symbols + our shims
     let bindings = bindgen::Builder::default()
-        // The input header we would like to generate
-        // bindings for.
         .header("wrapper.h")
-        // point to headers
-        .clang_arg("-IC:/Program Files/HDF_Group/HDF5/1.14.6/include")
+        .clang_arg(
+            r"-IC:\Users\Austin\Documents\hdf5-1.14.6\install114\my-Static-Tools-Clang\include",
+        )
+        .clang_arg("-Wl,/DEF:exports.def")
         .generate_comments(false)
-        // Tell cargo to invalidate the built crate whenever any of the
-        // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        // grab constants
-        .allowlist_function("H5.*")
+        .allowlist_function("H5.*") // all H5Tget_native_type, H5Tcreate, etc.
         .allowlist_type("H5.*")
         .allowlist_var("H5.*")
-        // Finish the builder and generate the bindings.
         .generate()
-        // Unwrap the Result and panic on failure.
-        .expect("Unable to generate bindings");
+        .expect("Unable to generate HDF5 bindings");
 
-    // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
+    let out = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings.write_to_file(out.join("bindings.rs")).unwrap();
+
+    // 3) Link with HDF5 and our shim
+    println!(
+        "cargo:rustc-link-search=native=C:/Users/Austin/Documents/hdf5-1.14.6/install114/my-Static-Tools-Clang/lib"
+    );
+    println!("cargo:rustc-link-lib=static=hdf5");
+    println!("cargo:rustc-link-lib=static=shim");
 }
